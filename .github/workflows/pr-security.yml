@@ -1,0 +1,59 @@
+name: PR Security Scan
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'backend/**/requirements*.txt'  
+      - 'backend/**/Dockerfile'        
+      - 'frontend/Dockerfile'
+      - 'k8s/**'
+      - '.github/workflows/**'
+
+jobs:
+  trivy-fs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Trivy scan (filesystem)
+        uses: aquasecurity/trivy-action@0.24.0
+        with:
+          scan-type: fs
+          ignore-unfixed: true
+          severity: CRITICAL,HIGH
+          exit-code: '1'
+
+  trivy-backend-image:
+    runs-on: ubuntu-latest
+    needs: trivy-fs
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build backend product_service image
+        run: docker build -t prscan-product:tmp backend/product_service
+
+      - name: Trivy scan (product_service image)
+        uses: aquasecurity/trivy-action@0.24.0
+        with:
+          image-ref: prscan-product:tmp
+          ignore-unfixed: true
+          severity: CRITICAL,HIGH
+          exit-code: '1'
+
+  trivy-frontend-image:
+    runs-on: ubuntu-latest
+    needs: trivy-fs
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build frontend image
+        run: docker build -t prscan-frontend:tmp frontend
+
+      - name: Trivy scan (frontend image)
+        uses: aquasecurity/trivy-action@0.24.0
+        with:
+          image-ref: prscan-frontend:tmp
+          ignore-unfixed: true
+          severity: CRITICAL,HIGH
+          exit-code: '1'
